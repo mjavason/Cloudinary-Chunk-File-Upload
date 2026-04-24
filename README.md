@@ -1,6 +1,6 @@
-# Typescript-SF-Template-App
+# Cloudinary Chunk File Upload
 
-This is a single file TypeScript template app for faster idea testing and prototyping. It contains tests, one demo root API call, basic async error handling, one demo axios call, and .env support.
+Simple demonstration of Cloudinary's resumable/chunked file upload.
 
 **Prerequisites**
 
