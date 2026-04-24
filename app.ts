@@ -3,7 +3,14 @@ import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import 'express-async-errors';
 import morgan from 'morgan';
-import { BASE_URL, PORT } from './constants';
+import { cloudinary } from './cloudinary.config';
+import {
+  BASE_URL,
+  CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET,
+  CLOUDINARY_CLOUD_NAME,
+  PORT,
+} from './constants';
 import { setupSwagger } from './swagger.config';
 
 //#region App Setup
@@ -22,7 +29,32 @@ setupSwagger(app, BASE_URL);
 //#endregion App Setup
 
 //#region Code here
-console.log('Hello world');
+/**
+ * @swagger
+ * /cloudinary/sign:
+ *   get:
+ *     summary: Generate Cloudinary upload signature
+ *     tags: [Cloudinary]
+ */
+app.get('/cloudinary/sign', (req: Request, res: Response) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const paramsToSign = {
+    timestamp,
+    folder: 'uploads',
+  };
+
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, CLOUDINARY_API_SECRET);
+
+  return res.json({
+    timestamp,
+    signature,
+    apiKey: CLOUDINARY_API_KEY,
+    cloudName: CLOUDINARY_CLOUD_NAME,
+    folder: 'chunk_test',
+  });
+});
+
 //#endregion
 
 //#region Server Setup

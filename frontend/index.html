@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Cloudinary Upload Test</title>
+
+    <style>
+        #progressContainer {
+            width: 300px;
+            height: 20px;
+            border: 1px solid #000;
+            margin-top: 10px;
+        }
+
+        #progressBar {
+            height: 100%;
+            width: 0%;
+            background: blue;
+            transition: width 0.2s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <input type="file" id="fileInput" />
+    <button id="uploadBtn">Upload</button>
+
+    <div id="progressContainer">
+        <div id="progressBar"></div>
+    </div>
+
+    <pre id="log"></pre>
+
+    <script>
+        const API_BASE = "http://localhost:5000";
+
+        const logEl = document.getElementById("log");
+        const progressBar = document.getElementById("progressBar");
+
+        const log = (msg) => {
+            logEl.textContent += msg + "\n";
+        };
+
+        const setProgress = (percent) => {
+            progressBar.style.width = percent + "%";
+        };
+
+        document.getElementById("uploadBtn").onclick = async () => {
+            const file = document.getElementById("fileInput").files[0];
+            if (!file) return;
+
+            log("requesting signature...");
+
+            const signRes = await fetch(`${API_BASE}/cloudinary/sign`);
+            const signData = await signRes.json();
+            log("got signature:");
+            log(JSON.stringify(signData, null, 2));
+
+            const formData = new FormData();
+
+            formData.append("file", file);
+            formData.append("api_key", signData.apiKey);
+            formData.append("timestamp", signData.timestamp);
+            formData.append("signature", signData.signature);
+            formData.append("folder", signData.folder);
+
+            const cloudName = signData.cloudName;
+
+            const uploadUrl =
+                `https://api.cloudinary.com/v1_1/${cloudName}/upload`;
+
+            log("uploading...");
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", uploadUrl);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    setProgress(percent);
+                    log(`progress: ${percent}%`);
+                }
+            };
+
+            xhr.onload = () => {
+                const res = JSON.parse(xhr.responseText);
+
+                setProgress(100);
+
+                log("done:");
+                log(JSON.stringify(res, null, 2));
+                log(JSON.stringify({
+                    url: res.secure_url,
+                    public_id: res.public_id
+                }, null, 2));
+            };
+
+            xhr.onerror = () => {
+                log("upload failed");
+            };
+
+            xhr.send(formData);
+        };
+    </script>
+</body>
+
+</html>
