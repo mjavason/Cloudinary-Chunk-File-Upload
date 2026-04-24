@@ -2,6 +2,10 @@
 
 Simple demonstration of Cloudinary's resumable/chunked file upload.
 
+# Summary
+
+The closest thing to chunk uploading that exists on cloudinary is stream upload. The entire chunking process has to be handled manually. We receive the chunks bit by bit, store them, once completed - we reassemble them, then upload to cloudinary.
+
 **Prerequisites**
 
 - Node.js and npm (or yarn) installed on your system. You can download them from the [official Node.js website](https://nodejs.org).
@@ -31,15 +35,12 @@ Simple demonstration of Cloudinary's resumable/chunked file upload.
 There are four main scripts defined in this project's `package.json` file:
 
 - **npm run dev**
-
   - This script is used for development purposes. It will start a development server and enable hot reloading.
 
 - **npm run build**
-
   - This script is used to build the project for production. It will bundle your code, minify files, and store them in a 'build' folder.
 
 - **npm run start**
-
   - This script starts the application in production mode. It's what you would typically run after building the project for deployment.
 
 - **npm run test**

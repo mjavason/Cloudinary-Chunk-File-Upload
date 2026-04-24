@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Cloudinary Upload Test</title>
+    <title>Chunk Upload Test</title>
 
     <style>
         #progressContainer {
@@ -46,61 +46,106 @@
             progressBar.style.width = percent + "%";
         };
 
+        const CHUNK_SIZE = 5 * 1024 * 1024;
+
+        function getChunks(file) {
+            const chunks = [];
+            let start = 0;
+
+            while (start < file.size) {
+                chunks.push(file.slice(start, start + CHUNK_SIZE));
+                start += CHUNK_SIZE;
+            }
+
+            return chunks;
+        }
+
+        function createFileId(file) {
+            return `${file.name}-${file.size}-${file.lastModified}`;
+        }
+
+        async function uploadChunks(file) {
+            const chunks = getChunks(file);
+            const fileId = createFileId(file);
+
+            log(`chunks: ${chunks.length}`);
+
+            for (let i = 0; i < chunks.length; i++) {
+                const form = new FormData();
+
+                form.append("chunk", chunks[i]);
+                form.append("fileId", fileId);
+                form.append("index", String(i));
+                form.append("total", String(chunks.length));
+
+                const res = await fetch(`${API_BASE}/upload-chunk`, {
+                    method: "POST",
+                    body: form
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Chunk ${i} failed`);
+                }
+
+                const percent = Math.round(((i + 1) / chunks.length) * 100);
+                setProgress(percent);
+
+                log(`uploaded chunk ${i + 1}/${chunks.length}`);
+            }
+
+            return fileId;
+        }
+
+        async function finalizeUpload(fileId, fileName) {
+            const res = await fetch(`${API_BASE}/finalize-upload`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    fileId,
+                    fileName
+                })
+            });
+
+            if (!res.ok) {
+                throw new Error("Finalize failed");
+            }
+
+            return await res.json();
+        }
+
         document.getElementById("uploadBtn").onclick = async () => {
             const file = document.getElementById("fileInput").files[0];
             if (!file) return;
+            if (file.size > 20 * 1024 * 1024) {
+                log("File too large. Max size is 20MB.");
+                return;
+            }
 
-            log("requesting signature...");
+            try {
+                log("starting chunk upload...");
 
-            const signRes = await fetch(`${API_BASE}/cloudinary/sign`);
-            const signData = await signRes.json();
-            log("got signature:");
-            log(JSON.stringify(signData, null, 2));
+                const fileId = await uploadChunks(file);
 
-            const formData = new FormData();
+                log("finalizing...");
 
-            formData.append("file", file);
-            formData.append("api_key", signData.apiKey);
-            formData.append("timestamp", signData.timestamp);
-            formData.append("signature", signData.signature);
-            formData.append("folder", signData.folder);
-
-            const cloudName = signData.cloudName;
-
-            const uploadUrl =
-                `https://api.cloudinary.com/v1_1/${cloudName}/upload`;
-
-            log("uploading...");
-
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", uploadUrl);
-
-            xhr.upload.onprogress = (e) => {
-                if (e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 100);
-                    setProgress(percent);
-                    log(`progress: ${percent}%`);
-                }
-            };
-
-            xhr.onload = () => {
-                const res = JSON.parse(xhr.responseText);
+                const result = await finalizeUpload(fileId, file.name);
 
                 setProgress(100);
 
                 log("done:");
-                log(JSON.stringify(res, null, 2));
+                log(JSON.stringify(result, null, 2));
+
                 log(JSON.stringify({
-                    url: res.secure_url,
-                    public_id: res.public_id
+                    url: result.secure_url,
+                    public_id: result.public_id
                 }, null, 2));
-            };
 
-            xhr.onerror = () => {
-                log("upload failed");
-            };
-
-            xhr.send(formData);
+            } catch (err) {
+                log("error:");
+                log(err.message);
+            }
         };
     </script>
 </body>

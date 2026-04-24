@@ -2,16 +2,11 @@ import axios from 'axios';
 import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import 'express-async-errors';
+import fs from 'fs-extra';
 import morgan from 'morgan';
-import { cloudinaryConfig } from './cloudinary.config';
-import {v2 as cloudinary} from 'cloudinary';
-import {
-  BASE_URL,
-  CLOUDINARY_API_KEY,
-  CLOUDINARY_API_SECRET,
-  CLOUDINARY_CLOUD_NAME,
-  PORT,
-} from './constants';
+import path from 'path';
+import { TempDir, upload, uploadToCloudinaryAsStream } from './cloudinary.config';
+import { BASE_URL, PORT } from './constants';
 import { setupSwagger } from './swagger.config';
 
 //#region App Setup
@@ -30,29 +25,48 @@ setupSwagger(app, BASE_URL);
 //#endregion App Setup
 
 //#region Code here
-/**
- * @swagger
- * /cloudinary/sign:
- *   get:
- *     summary: Generate Cloudinary upload signature
- *     tags: [Cloudinary]
- */
-app.get('/cloudinary/sign', (req: Request, res: Response) => {
-  const timestamp = Math.floor(Date.now() / 1000);
 
-  const paramsToSign = {
-    timestamp,
-    folder: 'chunk_test',
+app.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
+  const { fileId, index } = req.body;
+
+  const dir = path.join(TempDir, fileId);
+  await fs.ensureDir(dir);
+
+  const chunkPath = path.join(dir, `${index}`);
+  await fs.writeFile(chunkPath, req.file!.buffer);
+
+  res.json({
+    success: true,
+    message: 'Chunk uploaded successfully',
+    data: { index: Number(index) },
+  });
+});
+
+app.post('/finalize-upload', async (req, res) => {
+  const { fileId } = req.body;
+
+  const dir = path.join(process.cwd(), 'tmp_uploads', fileId);
+  const files = await fs.readdir(dir);
+  const sorted = files.sort((a, b) => Number(a) - Number(b));
+  const buffers = [];
+
+  for (const f of sorted) {
+    const data = await fs.readFile(path.join(dir, f));
+    buffers.push(data);
+  }
+
+  const finalBuffer = Buffer.concat(buffers);
+  const result = (await uploadToCloudinaryAsStream(finalBuffer, { folder: 'chunk_uploads' })) as {
+    secure_url: string;
+    public_id: string;
   };
 
-  const signature = cloudinary.utils.api_sign_request(paramsToSign, CLOUDINARY_API_SECRET);
+  await fs.remove(dir);
 
-  return res.json({
-    timestamp,
-    signature,
-    apiKey: CLOUDINARY_API_KEY,
-    cloudName: CLOUDINARY_CLOUD_NAME,
-    folder: 'chunk_test',
+  res.json({
+    success: true,
+    message: 'File uploaded successfully to Cloudinary',
+    data: { url: result.secure_url, publicId: result.public_id },
   });
 });
 
