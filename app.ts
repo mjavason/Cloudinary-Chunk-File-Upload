@@ -3,7 +3,8 @@ import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import 'express-async-errors';
 import morgan from 'morgan';
-import { cloudinary } from './cloudinary.config';
+import { cloudinaryConfig } from './cloudinary.config';
+import {v2 as cloudinary} from 'cloudinary';
 import {
   BASE_URL,
   CLOUDINARY_API_KEY,
@@ -41,7 +42,7 @@ app.get('/cloudinary/sign', (req: Request, res: Response) => {
 
   const paramsToSign = {
     timestamp,
-    folder: 'uploads',
+    folder: 'chunk_test',
   };
 
   const signature = cloudinary.utils.api_sign_request(paramsToSign, CLOUDINARY_API_SECRET);
