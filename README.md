@@ -4,7 +4,13 @@ Simple demonstration of Cloudinary's resumable/chunked file upload.
 
 # Summary
 
-The closest thing to chunk uploading that exists on cloudinary is stream upload. The entire chunking process has to be handled manually. We receive the chunks bit by bit, store them, once completed - we reassemble them, then upload to cloudinary.
+Cloudinary does not manage browser-to-Cloudinary chunk assembly for this flow. Instead, this backend:
+
+1. Receives file chunks from the client
+2. Stores each chunk temporarily on disk
+3. Reassembles all chunks in order
+4. Uploads the reconstructed file buffer to Cloudinary via `upload_stream`
+5. Deletes temporary chunk files
 
 **Prerequisites**
 
